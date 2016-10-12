@@ -1,13 +1,14 @@
 {
   "name": "simpleform",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": "Roman Nosov <rnosov@gmail.com>",
-  "description": "Quickly create simple React forms",
+  "description": "Quickly auto generate simple React forms styled with Bootstrap 4",
   "license": "MIT",
   "keywords": [
     "react",
     "simple",
     "form",
+    "autoform",
     "generator",
     "bootstrap",
     "bootstrap4",
@@ -18,8 +19,12 @@
     "type": "git",
     "url": "https://github.com/rnosov/simpleform"
   },
- "main": "./dist/index.js",
- "dependencies": {
+  "bugs": {
+    "url": "https://github.com/rnosov/simpleform/issues"
+  },
+  "homepage": "https://github.com/rnosov/simpleform",
+  "main": "./dist/index.js",
+  "dependencies": {
     "babel-runtime": "^6.11.6",
     "react-overlays": "^0.6.6",
 	  "react-scroll": "^1.2.0",
@@ -32,6 +37,7 @@
     "bootstrap": "^4.0.0-alpha.4"
   },
   "devDependencies": {
+    "react": "^15.3.1",
     "babel-cli": "^6.14.0",
     "babel-core": "^6.11.4",
     "babel-jest": "^15.0.0",

@@ -1,5 +1,5 @@
 /*
- * SimpleForm Test Suite
+ * RestForm Test Suite
  *
  * Copyright © Roman Nosov 2016
  *
@@ -9,11 +9,11 @@
 
 import React from 'react';
 import { mount } from 'enzyme';
-import SimpleForm from '../src/SimpleForm';
+import RestForm from '../src/RestForm';
 
-describe('SimpleForm', () => {
+describe('RestForm', () => {
   it('renders a initial view', () => {
-    const form = mount(<SimpleForm field1 field2="*" onSubmit={ () => void 0 } />);
+    const form = mount(<RestForm endpoint="" schema={{}} setStatus={ () => void 0 } onResponseReceived={ () => void 0 } />);
     expect(form.html()).toMatchSnapshot();
   });
 });

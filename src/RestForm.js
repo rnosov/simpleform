@@ -14,9 +14,9 @@ const
   propTypes = {
     endpoint: PropTypes.string.isRequired,
     schema: PropTypes.object.isRequired,
-    onFormWillFetch: PropTypes.func,
     setStatus: PropTypes.func.isRequired,
     onResponseReceived: PropTypes.func.isRequired,
+    onFormWillFetch: PropTypes.func,
     waitText: PropTypes.string,
     errorText: PropTypes.string,
     successText: PropTypes.string,
@@ -25,6 +25,10 @@ const
   },
   defaultProps = {
     scrollOrigin: 'content',
+    waitText: 'Uploading form. Please wait ...',
+    errorText: 'Houston, we have a problem!',
+    successText: 'Your form has been submitted successfully',
+    welcomeText: 'Welcome, please fill in the form below:',
   };
 
 class RestForm extends Component {
