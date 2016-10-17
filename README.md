@@ -1,5 +1,6 @@
 # SimpleForm React Component
 
+Probably the simplest React form generator you've ever seen.
 Quickly create simple React forms styled for Bootstrap 4.
 
 ## Live Examples 
@@ -11,7 +12,7 @@ Two examples are available:
 
 ## Introduction
 
-`SimpleForm` is intended to be a basic building block of reasonably simple React forms. Currently it is styled for Bootstrap 4. The idea is to be able to create simple React forms very quickly and efficiently. Having said that, you might want to use higher level components such as [React Checkout](https://www.npmjs.com/package/react-checkout) instead of using `SimpleForm` directly.
+`SimpleForm` is intended to be a basic building block of reasonably simple React forms. Currently, it is styled for Bootstrap 4. The idea is to be able to create simple React forms very quickly and efficiently. Having said that, you might want to use downstream packages such as [React Checkout](https://www.npmjs.com/package/react-checkout) and [Redux SimpleForm](https://www.npmjs.com/package/redux-simpleform) instead of using `SimpleForm` directly.
 
 To install the package run the following command in the command prompt:
 
@@ -27,44 +28,37 @@ import 'bootstrap/dist/css/bootstrap.css'; //import Bootstrap if you haven't don
 import SimpleForm from 'simpleform'; 
 ```
 
-Now you're ready to use it inside your render method. SimpleForm at its core has only one required prop called `onSubmit`:
+Now you're ready to use it inside your render method.
 
 ```javascript
-<SimpleForm onSubmit={ form => { console.log(form); } }  />
+<SimpleForm />
 ```
 
 You should see a Submit button. Now let's try something more complicated. Add any props you like to the `SimpleForm`:
 
 ```javascript
-<SimpleForm 
-  Some_Field
-  Name
-  Phone
-  onSubmit={ form => { console.log(form); } }  
-/>
+<SimpleForm name phone some_field />
 ```
 
-They should magically turn into corresponding fields in the form. If you press submit the contents of the form should be dumped to the browser console. As you can see each field name corresponds to the equivalent prop (dashes are removed in field names). 
+They should magically turn into corresponding fields in the form. If you press submit the contents of the form should be dumped to the browser console. As you can see each field name corresponds to the equivalent prop. 
 
-What if you want to make some fields required? You can do so in several ways. For example, using the shorthand notation:
+What if you want to make some fields required? Very easy:
 
 ```javascript
 <SimpleForm 
-  Some_Field
-  Name="*"
-  Phone
-  onSubmit={ form => { console.log(form); } }  
+  some_field
+  name="*"
+  phone  
 />
 ```
 
 
-There are many some other attributes we can set for a field:
+We can also set some more attributes for each field:
 
 ```javascript
 <SimpleForm 
-  Name
-  Phone="*tel|+44 207 123 4567|Enter your phone number|Phone Number"
-  onSubmit={ form => { console.log(form); } }  
+  name="|Jane Doe"
+  phone="*tel|+44 207 123 4567|Enter your phone number|Phone Number"  
 />
 ```
 
@@ -72,34 +66,77 @@ Although, it's very simple to use props to generate fields it's not something we
 
 ```javascript
 <SimpleForm 
-  fields={{    
-    Name: '',
-    Phone: "*tel|+44 207 123 4567|Enter your phone number|Phone Number",
-  }}
-  onSubmit={ form => { console.log(form); } }  
+  fields={[
+    "name: |Jane Doe",
+    "phone: *tel|+44 207 123 4567|Enter your phone number|Phone Number",
+  ]}
 />
 ```
 
-If the `fields` prop is set `SimpleForm` will use it instead  of magically turning props into form fields.
+In this way field order is guaranteed. If the `fields` prop is set `SimpleForm` will use it instead  of magically turning props into form fields. 
+
+To process entered data, just use onSubmit event:
+
+```javascript
+<SimpleForm 
+  fields={[
+    "name: |Jane Doe",
+    "phone: *tel|+44 207 123 4567|Enter your phone number|Phone Number",
+  ]}
+  onSubmit={ form => { console.log(form); } }
+/>
+```
 
 ## Documentation
 
 ### Type Strings
 
-This is a key `SimpleForm` concept. Type String is a shorthand notation to describe form field that can fit into a regular string. For example:
+`SimpleForm` employs a very simple domain-specific language (DSL)) to define fields. Type Strings are written in this domain-specific language to describe form field and can be packed into a regular string. For example:
 
 ```javascript
-  "Name: *type|Placeholder|Hint|Label|Value"
+  "name: *type|Placeholder|Hint|Label|Value"
 ```
 
 It would create a form field which is named `Name`, because of `*` it will be required, its HTML5 type will be set to `type` the field placeholder will be set to `Placeholder`, hint text set to `Hint`, field label set to `Label` and the default value will be `Value`.
 
 All parts are optional. Empty string or boolean values are therefore valid type string. If the name is not set then the associated prop or object key would be used instead. You must set the name if you're using array to set the type strings.
 
+`SimpleForm` pretty much all HTML5 input types. There are few special cases:
+
++ If type is a number then it is treated as a Textarea and the number is used to set number of rows in the Textarea. For example:
+
+```javascript
+  "5|I'm a Textarea with 5 rows"
+```
+
++ If type is either `$` or `£` it is treated as a currency input 
+
+```javascript
+  "$"
+```
+
++ Square brackets are treated as a list of options:
+
+```javascript
+  "[ option 1, option 2, option 3]"
+```
+
++ There are more usual suspects such date:
+
+```javascript
+  "date"
+```
+
++ and number 
+
+```javascript
+  "number"
+```
+
 ### SimpleForm Properties
 
-- `onSubmit` **[function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function)** onSubmit event handler. Upon callback it receives object containg all form data. **Required**.
-- `fields` **[object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object)** `SimpleForm` fields. It could be either Array containing `Type Strings` or object with keys corresponding to `Type Strings`. See examples above. **Optional**.
+- `onSubmit` **[function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function)** onSubmit event handler. Upon callback it receives object containg all form data. By default it logs contents of the form to the console. **Optional**.
+- `fields` **[object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object)** `SimpleForm` fields. It could be either Array containing `Type Strings` or object with keys corresponding to `Type Strings`. If this prop is not set additional props are converted to form fields. See examples above. **Optional**.
 - `className` **[string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String)** `Simpleform` outer CSS class. Defaults to "m-x-1 text-xs-left". **Optional**.
 - `submitText` **[string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String)** Text displayed on the submit button. Defaults to "Submit". **Optional**.
 - `leftClass` **[string](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String)** Left column CSS class. Defaults to "col-sm-2". **Optional**.
@@ -163,8 +200,10 @@ class App extends Component {
           To get started, edit <code>src/App.js</code> and save to reload.
         </p>
         <SimpleForm 
-          Name
-          Phone="*tel|+44 207 123 4567|Enter your phone number|Phone Number"             
+          fields={[
+            "name: |Jane Doe",
+            "phone: *tel|+44 207 123 4567|Enter your phone number|Phone Number",
+          ]}
           onSubmit={ form => { console.log(form); } }  
         />
       </div>

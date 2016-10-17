@@ -9,15 +9,17 @@
 import React, { PropTypes, Component } from 'react';
 import { List, Record } from 'immutable';
 import Transition from 'react-overlays/lib/Transition';
+import humanize from 'underscore.string/humanize';
+import titleize from 'underscore.string/titleize';
 
 const
   propTypes = {
+    onSubmit: PropTypes.func,
     fields: PropTypes.oneOfType([PropTypes.object, PropTypes.array ]),
     className: PropTypes.string,
     leftClass: PropTypes.string,
     centralClass: PropTypes.string,
     rightClass: PropTypes.string,
-    onSubmit: PropTypes.func.isRequired,
     submitText: PropTypes.string,
     requiredFieldText: PropTypes.string,
     emptyFieldText: PropTypes.string,
@@ -51,6 +53,7 @@ const
     totalErrorsEnteringClass: 'simpleform-bounce',
     totalErrorsLeavingClass: 'simpleform-fadeOut',
     noscriptText: 'Please enable javascript in order to use this form.',
+    onSubmit: form => { console.log(form); },
     totalErrorsText: c => `There ${c > 1 ?`are ${c} errors`:'is one error'} in the form`,
   };
 
@@ -83,14 +86,16 @@ class SimpleForm extends Component {
       placeholder: '',
       hint: '',
       label: '',
-      value: '',
       options: false,
+      autoComplete: false,
+      onChange: false,
+      validate: ::this.validate,
+      value: '',
+      message: false,
       error: false,
       warning: false,
       changed: false,
       touched: false,
-      message: false,
-      validate: ::this.validate,
     });
     let fields = [];
     if (props.fields) {
@@ -138,6 +143,7 @@ class SimpleForm extends Component {
       options = type;
       type = 'textarea';
     }
+    //if (!label) label = name.toString().replace(/[-_]/g, ' ');
     return {
       name: key,
       required: match[1] === '*',
@@ -145,14 +151,14 @@ class SimpleForm extends Component {
       options,
       placeholder: split[1] || '',
       hint: split[2],
-      label: split[3],
+      label: split[3] || titleize(humanize(key), false),
       value: split[4] || '',
     };
   }
 
-  componentWillReceiveProps(props) {
-    this.parseProps(props);
-  }
+  //componentWillReceiveProps(props) {
+  //  this.parseProps(props);
+  //}
 
   componentWillMount() {
     this.parseProps(this.props);
@@ -236,16 +242,18 @@ class SimpleForm extends Component {
   }
 
   renderField(field, ctrlClass) {
-    const props = {
+    let props = {
       className: `form-control${ctrlClass}`,
       onChange: this.onChange,
       onBlur: this.onBlur,
       value: field.value,
       'data-id': field.id,
     };
+    if (field.autoComplete)
+      props.autoComplete = field.autoComplete;
     switch (field.type) {
       case '$':
-      case '£': return this.inputGroup(type, <input {...props} type="number" placeholder={field.placeholder} />);
+      case '£': return this.inputGroup(field.type, <input {...props} type="number" placeholder={field.placeholder} />);
       case 'textarea': return <textarea {...props} rows={field.options} placeholder={field.placeholder} />;
       case 'date': return <input {...props} type="date" style={{ minHeight: '2.375rem' }} placeholder="dd/mm/yyyy" />;
       case 'options': return this.renderOptions(field, props);
@@ -255,7 +263,6 @@ class SimpleForm extends Component {
 
   formRow(field) {
     let { label, hint, type, error, warning, touched, name } = field;
-    if (!label) label = name.toString().replace(/[-_]/g, ' ');
     let hasClass = '', ctrlClass='', hasMessage = false;
     if (touched) {
       ctrlClass = error ? 'danger' : ( warning ? 'warning' : 'success' );
@@ -296,10 +303,10 @@ class SimpleForm extends Component {
 
   footer() {
     let atLeastOneMandatoryField = false;
-    let errorCounter = this.state.fields.reduce( (r, { error, required } ) => {
+    let errorCounter = this.state.fields.reduce( (r, { error, required, touched } ) => {
       if (required && !atLeastOneMandatoryField)
         atLeastOneMandatoryField = true;
-      return error ? r + 1 : r
+      return error&&touched ? r + 1 : r
     }, 0);
     return(
       <div className={ 'form-group row'+(errorCounter?' has-danger':'') }>

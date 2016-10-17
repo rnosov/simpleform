@@ -1,8 +1,8 @@
 {
   "name": "simpleform",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "author": "Roman Nosov <rnosov@gmail.com>",
-  "description": "Quickly auto generate simple React forms styled for Bootstrap 4",
+  "description": "Probably the simplest React form generator you've ever seen",
   "license": "MIT",
   "keywords": [
     "react",
@@ -26,7 +26,8 @@
   "dependencies": {
     "babel-runtime": "^6.11.6",
     "immutable": "^3.8.1",
-    "react-overlays": "^0.6.6"
+    "react-overlays": "^0.6.6",
+    "underscore.string": "^3.3.4"
   },
   "peerDependencies": {
     "react": "^15.3.1",
