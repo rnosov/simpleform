@@ -1,8 +1,8 @@
 {
   "name": "simpleform",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "author": "Roman Nosov <rnosov@gmail.com>",
-  "description": "Quickly auto generate simple React forms styled with Bootstrap 4",
+  "description": "Quickly auto generate simple React forms styled for Bootstrap 4",
   "license": "MIT",
   "keywords": [
     "react",
@@ -12,8 +12,7 @@
     "generator",
     "bootstrap",
     "bootstrap4",
-    "bs4",
-    "redux"
+    "bs4"
   ],
   "repository": {
     "type": "git",
@@ -26,11 +25,8 @@
   "main": "./dist/index.js",
   "dependencies": {
     "babel-runtime": "^6.11.6",
-    "react-overlays": "^0.6.6",
-	  "react-scroll": "^1.2.0",
-	  "react-redux": "^4.4.5",
-	  "redux": "^3.5.2",
-	  "react-addons-update": "^15.3.0"
+    "immutable": "^3.8.1",
+    "react-overlays": "^0.6.6"
   },
   "peerDependencies": {
     "react": "^15.3.1",

@@ -7,12 +7,13 @@
  * LICENSE.txt file in the root directory of this source tree.
  */
 import React, { PropTypes, Component } from 'react';
-import update from 'react-addons-update';
+import { List, Record } from 'immutable';
 import Transition from 'react-overlays/lib/Transition';
 
 const
   propTypes = {
-    schema: PropTypes.object,
+    fields: PropTypes.oneOfType([PropTypes.object, PropTypes.array ]),
+    className: PropTypes.string,
     leftClass: PropTypes.string,
     centralClass: PropTypes.string,
     rightClass: PropTypes.string,
@@ -28,11 +29,13 @@ const
     totalErrorsAnimationDuration: PropTypes.number,
     totalErrorsEnteringClass: PropTypes.string,
     totalErrorsLeavingClass: PropTypes.string,
-    totalErrorsText: PropTypes.func,
     noscriptText: PropTypes.string,
+    totalErrorsText: PropTypes.func,
+    onParsingComplete: PropTypes.func,
     children: React.PropTypes.node,
   },
   defaultProps = {
+    className: 'm-x-1 text-xs-left',
     leftClass: 'col-sm-2',
     centralClass: 'col-sm-5',
     rightClass: 'col-sm-4',
@@ -41,273 +44,314 @@ const
     emptyFieldText: 'Empty field',
     dodgyEmailText: 'It doesn\'t look like an email',
     mandatoryFieldText: 'Mandatory fields',
-
     animationDuration: 1000,
     totalErrorsAnimationDuration: 400,
     enteringClass: 'simpleform-rotateInDownRight',
     leavingClass: 'simpleform-bounceOutDown',
     totalErrorsEnteringClass: 'simpleform-bounce',
     totalErrorsLeavingClass: 'simpleform-fadeOut',
-
     noscriptText: 'Please enable javascript in order to use this form.',
     totalErrorsText: c => `There ${c > 1 ?`are ${c} errors`:'is one error'} in the form`,
   };
 
-function animate( duration = 1000 ) {
-  return {
-    WebkitAnimationDuration: `${duration / 1000}s`,
-    animationDuration: `${duration / 1000}s`,
-    WebkitAnimationFillMode: 'both',
-    animationFillMode: 'both',
-  };
-}
-
 class SimpleForm extends Component {
 
-  state = {
-    values: {},
-    errors: {},
-    messages: {},
-    warnings: {},
-    touched: {},
-    showErrors: true,
-  };
+  constructor() {
+    super();
+    this.state = {};
+    this.onSubmit = ::this.handleSubmit;
+    this.onChange = ::this.handleChange;
+    this.onBlur = ::this.handleBlur;
+  }
 
-  handleBlur({ target: { id } }) {
-    if (this.state.errors[id] === true || this.state.errors[id] === false)
-      this.setState(update(this.state, this.touch({}, id)));
+  static animate( duration = 1000 ) {
+    return {
+      WebkitAnimationDuration: `${duration / 1000}s`,
+      animationDuration: `${duration / 1000}s`,
+      WebkitAnimationFillMode: 'both',
+      animationFillMode: 'both',
+    };
+  }
+
+  parseProps(props) {
+    const fieldRecord = Record({
+      id: '',
+      key: '',
+      name: '',
+      required: false,
+      type: 'text',
+      placeholder: '',
+      hint: '',
+      label: '',
+      value: '',
+      options: false,
+      error: false,
+      warning: false,
+      changed: false,
+      touched: false,
+      message: false,
+      validate: ::this.validate,
+    });
+    let fields = [];
+    if (props.fields) {
+      if (Array.isArray(props.fields))
+        fields = props.fields.map( field => typeof field === 'string' ? { typeStr: field } : field );
+      else for (let prop in props.fields)
+        if (props.fields.hasOwnProperty(prop))
+          fields.push(  typeof props.fields[prop] === 'string'
+                      ? { key: prop, typeStr: props.fields[prop] }
+                      : { key: prop, ...props.fields[prop] }
+          );
+    }
+    else for (let prop in props)
+      if( !propTypes.hasOwnProperty(prop) && props.hasOwnProperty(prop) )
+        fields.push(  typeof props[prop] === 'string'
+                      ? { key: prop, typeStr: props[prop] }
+                      : { key: prop, ...props[prop] }
+        );
+    fields = fields.map( (field, index) => new fieldRecord(
+      { ...this.parseTypeStr(field.typeStr, field.key), ...field, id: index }
+    ));
+    fields = List(fields);
+    if ( typeof this.props.onParsingComplete === 'function' )
+      fields = this.props.onParsingComplete(fields);
+    this.setState({ fields, showErrors: true });
+  }
+
+  parseTypeStr(typeStr, key = '') {
+    let match = [], split = [];
+    if ( typeStr && typeof typeStr === 'string' ) {
+      split = typeStr.split('|');
+      let split2 = split[0].split(/[:=]/, 2), matchkey = 0;
+      if (split2.length > 1){
+        key = split2[0];
+        matchkey = 1;
+      }
+      match = split2[matchkey].match(/\s*([\*\?])?\s*(.*)/i);
+    }
+    let type = match[2] || 'text', options = false;
+    if (type[0] == '[') {
+      options = type.slice(1, -1).split(',');
+      type = 'options';
+    }
+    else if (/^\d+$/.test(type)) {
+      options = type;
+      type = 'textarea';
+    }
+    return {
+      name: key,
+      required: match[1] === '*',
+      type,
+      options,
+      placeholder: split[1] || '',
+      hint: split[2],
+      label: split[3],
+      value: split[4] || '',
+    };
+  }
+
+  componentWillReceiveProps(props) {
+    this.parseProps(props);
+  }
+
+  componentWillMount() {
+    this.parseProps(this.props);
+  }
+
+  handleBlur({ target }) {
+    const id = target.getAttribute('data-id'),
+          { changed, touched } = this.state.fields.get(id);
+    if (changed && !touched)
+      this.setState({
+        fields: this.state.fields.update(id, field => field.set('touched', true))
+      });
   }
 
   handleChange({ target }) {
-    let { id, value, type } = target;
+    const id = target.getAttribute('data-id');
+    let { value, type } = target;
     if (type === 'number' && +value < 0) return;
-    const field = this.getField(id);
-    if (typeof field.onChange === 'function'){
-      value = field.onChange(value, this.state.values[id]);
-    }
-    this.setState(update(this.state, this.validate(field, value)));
+    this.setState( ({ fields }) => ({
+      fields: fields.update(id, field => {
+        if (typeof field.onChange === 'function')
+          value = field.onChange(value, field.value);
+        if (field.type === 'options')
+          value = field.value === value ? false : value;
+        if (!field.changed)
+          field = field.set('changed', true);
+        return field.validate(field.set('value', value));
+      })})
+    );
   }
 
   handleSubmit(ev) {
     ev.preventDefault();
-    let ids = this.filterProps(), errorCount = 0;
-    const validateAll = () => {
-      if (ids.length === 0) {
-        this.setState({ showErrors: true });
-        if (errorCount) {
-        }
-        else
-          this.props.onSubmit(this.state.values);
-        return;
-      }
-      const id = ids.pop();
-      const newState = this.touch(this.validate(this.getField(id), this.state.values[id]), id);
-      if (newState.errors[id].$set) errorCount++;
-      this.setState(update(this.state, newState), validateAll);
-    };
-    this.setState({ showErrors: false }, validateAll);
-  }
-
-  touch(state, field) {
-    state.touched = { [field]: { $set: true } };
-    return state;
-  }
-
-  parseVal(val) {
-    const found = val.match(/(\*)?([^\|\\]+)?(?:\|([^\|]*)\|?)?(.*)/i);
-    return {
-      required: found[1] || false,
-      type: found[2] || false,
-      placeholder: found[3] || '',
-      regex: found[4] || false,
-    };
-  }
-
-  filterProps() {
-    return this.props.schema
-      ? Object.keys(this.props.schema)
-      : Object.keys(this.props).filter(field => !propTypes.hasOwnProperty(field));
-  }
-
-  getField(id) {
-    let val = this.props.schema?this.props.schema[id]:this.props[id];
-    return (typeof val === 'string') ? { id, ...this.parseVal(val) } : { id, ...val };
-  }
-
-  validate(field, value) {
-    const { id, required, type, validate: validateFunc, error: errorMsg } = field;
-    let error = (required && !value) ? this.props.requiredFieldText : false;
-    let warning = !value /*&& type[0]!='['*/? this.props.emptyFieldText : false;
-    if (type === 'email' && !/^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(value))
-      warning = this.props.dodgyEmailText;
-    if (typeof validateFunc === 'function' && !validateFunc(value))
-      error = errorMsg || 'This field is invalid';
-    return {
-      values: { [id]: { $set: value } },
-      errors: { [id]: { $set: !!error } },
-      warnings: { [id]: { $set: !!warning } },
-      messages: { [id]: { $set: error || warning || this.state.messages[id] } },
-    };
-  }
-
-  renderInput({ id, type, placeholder, autoComplete }, ctrlClass) {
-    if (type === 'date')
-      return (
-        <input
-          onChange={ ::this.handleChange }
-          onBlur={ ::this.handleBlur }
-          value={ this.state.values[id]||'' }
-          type="date"
-          className={ `form-control${ctrlClass}` }
-          id={ id }
-          style={ { minHeight: '2.375rem' } }
-          placeholder="dd/mm/yyyy"
-          autoComplete={ autoComplete }
-        />
-    );
-    return (
-      <input
-        onChange={ ::this.handleChange }
-        onBlur={ ::this.handleBlur }
-        value={ this.state.values[id]||'' }
-        type={ type || 'text' }
-        className={ `form-control${ctrlClass}` }
-        id={ id }
-        placeholder={ placeholder }
-        autoComplete={ autoComplete }
-      />
+    const fields = this.state.fields.map( field => this.validate(field.set('touched', true)) );
+    if(!fields.reduce( (r, { error } ) => error ? r + 1 : r, 0)) //count errors
+      this.props.onSubmit(fields.map( ({ name, value }) => [name, value] ).fromEntrySeq().toJS());
+    this.setState({ showErrors: false }, () => // the idea here is to make the total error
+      setTimeout( () =>                        // count jump when user press Submit
+        this.setState({ ...this.state, fields, showErrors: true }),
+        this.props.totalErrorsAnimationDuration
+      )
     );
   }
 
-  handleOptionChange(id, option) {
-    return () => {
-      const value = (this.state.values[id] === option) ? false : option;
-      this.setState(update(this.state, this.touch(this.validate(this.getField(id), value), id)));
-    };
+  validate(field) {
+    const
+      { value, required, type } = field,
+      error = !(!required || value) && this.props.requiredFieldText,
+      warning = false
+      || !value && !(field.type === 'options' && field.options.length === 1 ) && this.props.emptyFieldText
+      || type === 'email' && !/^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(value) && this.props.dodgyEmailText;
+    return field
+    .set('error', !!error)
+    .set('warning', !!warning)
+    .set('message', error || warning || field.message);
   }
 
-  renderOptions(id, options) {
-    options = options.slice(1, -1).split(',');
-    return options.map(option => (
-      <label key={ option } className="form-check-inline form-control-static">
+  renderOptions(field, props) {
+    return field.options.map(option => (
+      <label key={option} className="form-check-inline form-control-static">
         <input
+          {...props}
           className="form-check-input"
           type="checkbox"
-          checked={ this.state.values[id] === option }
-          onChange={ this.handleOptionChange(id, option) }
-          name={ id }
-          value={ option }
-        /> {option}
+          checked={ this.state.fields.get(field.id).value === option }
+          value={option}
+        />
+        {option}
       </label>
     ));
   }
 
-  renderField(field, ctrlClass)
-  {
-    if (/^\d+$/.test(field.type)) return (
-      <textarea
-        onChange={ ::this.handleChange }
-        onBlur={ ::this.handleBlur }
-        value={ this.state.values[field.id]||'' }
-        rows={ field.type }
-        className={ `form-control${ctrlClass}` }
-        id={ field.id }
-        placeholder={ field.placeholder }
-      />
+  inputGroup(symbol, children) {
+    return (
+      <div className="input-group">
+        <span className="input-group-addon">{symbol}</span>
+          {children}
+        <span className="input-group-addon">.00</span>
+      </div>
     );
+  }
+
+  renderField(field, ctrlClass) {
+    const props = {
+      className: `form-control${ctrlClass}`,
+      onChange: this.onChange,
+      onBlur: this.onBlur,
+      value: field.value,
+      'data-id': field.id,
+    };
     switch (field.type) {
       case '$':
-      case '£': return (
-                  <div className="input-group">
-                    <span className="input-group-addon">{field.type}</span>
-                    {this.renderInput({ ...field, type: 'number' }, ctrlClass)}
-                    <span className="input-group-addon">.00</span>
-                  </div>
-                );
-      default: return this.renderInput(field, ctrlClass);
+      case '£': return this.inputGroup(type, <input {...props} type="number" placeholder={field.placeholder} />);
+      case 'textarea': return <textarea {...props} rows={field.options} placeholder={field.placeholder} />;
+      case 'date': return <input {...props} type="date" style={{ minHeight: '2.375rem' }} placeholder="dd/mm/yyyy" />;
+      case 'options': return this.renderOptions(field, props);
+      default: return <input {...props} type={field.type} placeholder={field.placeholder} />;
     }
   }
 
-  render() {
-    const { state: { errors, warnings, touched, messages } } = this;
-    const fieldIds = this.filterProps();
-    let atLeastOneMandatoryField = false, errorCounter = 0;
+  formRow(field) {
+    let { label, hint, type, error, warning, touched, name } = field;
+    if (!label) label = name.toString().replace(/[-_]/g, ' ');
+    let hasClass = '', ctrlClass='', hasMessage = false;
+    if (touched) {
+      ctrlClass = error ? 'danger' : ( warning ? 'warning' : 'success' );
+      hasClass += ' has-' + ctrlClass;
+      ctrlClass = ' form-control-' + ctrlClass;
+      hasMessage = error || warning;
+    }
     return (
-    <form onSubmit={ ::this.handleSubmit } className="m-x-1 text-xs-left" style={{overflow: 'hidden'}}>
-      <noscript>{this.props.noscriptText}</noscript>
-      {fieldIds.map(fieldId => {
-        let field = this.getField(fieldId);
-        let { required, type, hint, placeholder, label } = field;
-        if ( typeof label === 'undefined') label = fieldId.replace(/\-/g, ' ');
-        if (required) atLeastOneMandatoryField = true;
-        let hasClass = '', ctrlClass='', msg = false;
-        if (touched[fieldId]) {
-          if (errors[fieldId]) errorCounter++;
-          ctrlClass = errors[fieldId]?'danger':(warnings[fieldId]?'warning':'success');
-          hasClass += ' has-' + ctrlClass;
-          ctrlClass = ' form-control-' + ctrlClass;
-          msg = errors[fieldId] || warnings[fieldId] || false;
-        }
-        const isCheck = (type && type[0] == '[');
-        return (
-          <div className={ `form-group row${hasClass}` } key={ fieldId }>
-            <label htmlFor={ isCheck ? void 0 : fieldId } className={ `col-xs-12 text-sm-right col-form-label ${this.props.leftClass}` }>{(required?'*':'')+label}</label>
-            <div className={ `col-xs-12 ${this.props.centralClass}${hasClass}${isCheck?' checkbox':''}` }>
-              {isCheck ? this.renderOptions(fieldId, type) : this.renderField(field, ctrlClass)}
-              {do {
-                if (hint)
-                  <small className="form-text text-muted">{hint}</small>;
-                else if (type==='date')
-                  <small className="form-text text-muted">{placeholder}</small>;
-              }}
+      <div className={ `form-group row${hasClass}` } key={field.id}>
+        <label className={ `col-xs-12 text-sm-right col-form-label ${this.props.leftClass}` }>{(field.required?'*':'')+label}</label>
+        <div className={ `col-xs-12 ${this.props.centralClass}${hasClass}${ field.type === 'options' ? ' checkbox' : '' }` }>
+          {this.renderField(field, ctrlClass)}
+          {do {
+            if (hint)
+              <small className="form-text text-muted">{hint}</small>;
+            //else if ( type === 'date' )
+            //  <small className="form-text text-muted">{placeholder}</small>;
+          }}
+        </div>
+        <Transition
+          style={SimpleForm.animate(this.props.animationDuration)}
+          in={!!hasMessage}
+          timeout={this.props.animationDuration}
+          enteringClassName={this.props.enteringClass}
+          exitingClassName={this.props.leavingClass}
+          unmountOnExit
+          transitionAppear
+        >
+          <div className={ `col-xs-12 ${this.props.rightClass}` }>
+            <div className="form-control-static text-muted">
+              {field.message}
             </div>
-            <Transition
-              style={ animate(this.props.animationDuration) }
-              in={ !!msg }
-              timeout={ this.props.animationDuration }
-              enteringClassName={ this.props.enteringClass }
-              exitingClassName={ this.props.leavingClass }
-              unmountOnExit
-              transitionAppear
-            >
-              <div className={ `col-xs-12 ${this.props.rightClass}` }>
-                <div className="form-control-static text-muted">
-                  {messages[fieldId]}
-                </div>
-              </div>
-            </Transition>
           </div>
-        );
-      })}
+        </Transition>
+      </div>
+    );
+  }
+
+  footer() {
+    let atLeastOneMandatoryField = false;
+    let errorCounter = this.state.fields.reduce( (r, { error, required } ) => {
+      if (required && !atLeastOneMandatoryField)
+        atLeastOneMandatoryField = true;
+      return error ? r + 1 : r
+    }, 0);
+    return(
       <div className={ 'form-group row'+(errorCounter?' has-danger':'') }>
         <div className={ `col-xs-12 ${this.props.leftClass}` }>
           {do{
             if (atLeastOneMandatoryField) {
-              <small className="form-text text-muted text-sm-right form-control-static">*{this.props.mandatoryFieldText}</small>;
+              <small className="form-text text-muted text-sm-right form-control-static">
+                *{this.props.mandatoryFieldText}
+              </small>;
             }
           }}
         </div>
         <div className={ 'col-xs-12 form-inline col-sm-8' }>
           <div className="form-group has-danger">
-          <button type="submit" className="btn btn-outline-primary">{this.props.submitText}</button>
-          <div className="text-muted form-control-static">&nbsp;&nbsp; </div>
-          <Transition
-            style={ animate(this.props.totalErrorsAnimationDuration) }
-            timeout={ this.props.totalErrorsAnimationDuration }
-            in={ this.state.showErrors && (errorCounter>0) }
-            enteringClassName={ this.props.totalErrorsEnteringClass }
-            exitingClassName={ this.props.totalErrorsLeavingClass }
-            unmountOnExit
-            transitionAppear
-          >
-            <div className="text-muted form-control-static">{this.props.totalErrorsText(errorCounter)}</div>
-          </Transition>
-        </div>
+            <button type="submit" className="btn btn-outline-primary">
+              {this.props.submitText}
+            </button>
+            <div className="text-muted form-control-static">&nbsp;&nbsp; </div>
+            <Transition
+              style={SimpleForm.animate(this.props.totalErrorsAnimationDuration)}
+              timeout={this.props.totalErrorsAnimationDuration}
+              in={this.state.showErrors && (errorCounter>0)}
+              enteringClassName={this.props.totalErrorsEnteringClass}
+              exitingClassName={this.props.totalErrorsLeavingClass}
+              unmountOnExit
+              transitionAppear
+            >
+              <div className="text-muted form-control-static">
+                {this.props.totalErrorsText(errorCounter)}
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
-    </form>
-  );
+    );
   }
+
+  render() {
+    return (
+      <form
+        noValidate
+        onSubmit={this.onSubmit}
+        className={this.props.className}
+        style={{overflow: 'hidden'}}
+      >
+        <noscript>{this.props.noscriptText}</noscript>
+        {this.state.fields.map( field => this.formRow(field) )}
+        {this.footer()}
+      </form>
+    );
+  }
+
 }
 
 SimpleForm.propTypes = propTypes;
